@@ -1,0 +1,8 @@
+# Append this site block to the existing /etc/caddy/Caddyfile.
+# Replace the domain and the password hash from `caddy hash-password`.
+book.example.com {
+    basic_auth {
+        jeff REPLACE_WITH_PASSWORD_HASH
+    }
+    reverse_proxy 127.0.0.1:3001
+}

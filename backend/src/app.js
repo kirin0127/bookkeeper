@@ -8,7 +8,7 @@ const earliest = Date.parse('1900-01-01T00:00:00+08:00');
 const maxRange = 367 * 86400000;
 const columns = 'e.id, e.category_id, c.name AS category, e.amount, e.currency, e.recorded_at_ms, e.note';
 
-export function createApp(db, { staticDirectory = resolve(root, 'frontend/dist') } = {}) {
+export function createApp(db, { staticDirectory = resolve(root, 'frontend/dist'), releaseId = 'local' } = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.use('/api', (req, res, next) => {
@@ -27,7 +27,7 @@ export function createApp(db, { staticDirectory = resolve(root, 'frontend/dist')
   });
   app.use(express.json({ limit: '16kb' }));
   app.use('/api', createTransferRouter(db));
-  app.get('/api/health', (_req, res) => res.json({ ok: true }));
+  app.get('/api/health', (_req, res) => res.json({ ok: true, release: releaseId }));
   app.get('/api/categories', (_req, res) => {
     res.json(db.prepare('SELECT id, name, sort_order, is_active FROM categories ORDER BY sort_order, id').all());
   });

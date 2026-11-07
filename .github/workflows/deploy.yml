@@ -1,0 +1,73 @@
+name: Deploy Bookkeeper
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bookkeeper-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install, test and build
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      - name: Package Linux production release
+        env:
+          RELEASE_ID: ${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+        run: |
+          node scripts/package-release.mjs "$RUNNER_TEMP/bookkeeper-release" "$RELEASE_ID"
+          tar -czf "$RUNNER_TEMP/bookkeeper.tar.gz" -C "$RUNNER_TEMP/bookkeeper-release" .
+
+      - name: Upload and activate release
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: '22'
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          RELEASE_ID: ${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${VPS_HOST:?Add the VPS_HOST repository secret}"
+          : "${VPS_USER:?Add the VPS_USER repository secret}"
+          : "${VPS_SSH_KEY:?Add the VPS_SSH_KEY repository secret}"
+          [[ "$VPS_PORT" =~ ^[0-9]+$ ]]
+          [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$VPS_USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]]
+          if ! ssh-keygen -F bookkeeper-vps -f deploy/known_hosts > /dev/null; then
+            echo 'Add your verified VPS host public key to deploy/known_hosts (see deploy/README.md).' >&2
+            exit 1
+          fi
+          ssh_dir="$RUNNER_TEMP/bookkeeper-ssh"
+          mkdir -m 700 "$ssh_dir"
+          trap 'rm -rf "$ssh_dir"' EXIT
+          printf '%s\n' "$VPS_SSH_KEY" > "$ssh_dir/key"
+          cp deploy/known_hosts "$ssh_dir/known_hosts"
+          chmod 600 "$ssh_dir/key" "$ssh_dir/known_hosts"
+          options=(-i "$ssh_dir/key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o HostKeyAlias=bookkeeper-vps -o "UserKnownHostsFile=$ssh_dir/known_hosts" -o ConnectTimeout=15)
+          target="$VPS_USER@$VPS_HOST"
+          scp -P "$VPS_PORT" "${options[@]}" "$RUNNER_TEMP/bookkeeper.tar.gz" "$target:/opt/bookkeeper/incoming/$RELEASE_ID.tar.gz"
+          scp -P "$VPS_PORT" "${options[@]}" deploy/activate-release.sh "$target:/opt/bookkeeper/incoming/$RELEASE_ID.sh"
+          ssh -p "$VPS_PORT" "${options[@]}" "$target" "bash /opt/bookkeeper/incoming/$RELEASE_ID.sh $RELEASE_ID"

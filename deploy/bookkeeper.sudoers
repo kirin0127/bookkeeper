@@ -1,0 +1,2 @@
+# Replace deploy_user with the existing SSH account configured as VPS_USER.
+deploy_user ALL=(root) NOPASSWD: /usr/bin/systemctl restart bookkeeper.service, /usr/bin/systemctl stop bookkeeper.service

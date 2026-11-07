@@ -1,0 +1,27 @@
+[Unit]
+Description=Bookkeeper expense app
+After=network.target
+
+[Service]
+Type=simple
+User=bookkeeper
+Group=bookkeeper
+WorkingDirectory=/opt/bookkeeper/current
+ExecStart=/opt/node24/bin/node /opt/bookkeeper/current/backend/src/server.js
+Environment=NODE_ENV=production
+Environment=PORT=3001
+Environment=DB_PATH=/var/lib/bookkeeper/bookkeeper.db
+StateDirectory=bookkeeper
+StateDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/bookkeeper
+
+[Install]
+WantedBy=multi-user.target
