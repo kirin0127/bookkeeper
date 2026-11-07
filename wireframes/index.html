@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>記帳 App｜手機互動線稿</title>
+  <link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+  <div class="phone">
+    <header class="app-header"><span class="app-name">日常記帳</span><span class="prototype-label">線稿・示意資料</span></header>
+    <main id="main" tabindex="-1"></main>
+    <nav class="bottom-nav" aria-label="主要導覽">
+      <button type="button" data-tab="stats"><span aria-hidden="true">◴</span>統計</button>
+      <button type="button" data-tab="daily"><span aria-hidden="true">☷</span>每日明細</button>
+      <button type="button" data-tab="transfer"><span aria-hidden="true">⇅</span>匯入匯出</button>
+    </nav>
+    <div id="toast" class="toast" role="status"></div>
+  </div>
+  <dialog id="add-dialog" aria-labelledby="add-title">
+    <div class="sheet-header"><div><h2 id="add-title">新增花費</h2><p id="add-date"></p></div><button class="close" type="button" data-close aria-label="關閉新增花費">×</button></div>
+    <form id="expense-form">
+      <div class="sheet-body">
+        <label class="field-label" for="amount">金額 <span>必填・整數元</span></label>
+        <div class="amount-field"><span>NT$</span><input id="amount" name="amount" type="text" inputmode="numeric" autocomplete="off" placeholder="0" aria-describedby="form-error" required></div>
+        <label class="field-label" for="note">說明 <span>選填</span></label>
+        <input class="note-input" id="note" name="note" type="text" placeholder="例如：午餐、咖啡" maxlength="200">
+        <fieldset><legend class="field-label">類別 <span>必選一個</span></legend><div id="category-options" class="category-grid"></div></fieldset>
+        <div class="selected-category" aria-live="polite"><span>目前選擇的類別</span><strong id="selected-category">尚未選擇</strong></div>
+        <p id="form-error" class="form-error" role="alert"></p>
+      </div>
+      <div class="sheet-footer"><button class="secondary" type="button" data-close>取消</button><button class="primary" type="submit">儲存花費</button></div>
+    </form>
+  </dialog>
+  <dialog id="detail-dialog" aria-labelledby="detail-title">
+    <div class="sheet-header"><div><h2 id="detail-title"></h2><p id="detail-period"></p></div><button class="close" type="button" data-close aria-label="關閉分類明細">×</button></div>
+    <div class="detail-summary"><span id="detail-count"></span><strong id="detail-total"></strong></div>
+    <div class="sort-row"><span>排序</span><div class="segmented"><button type="button" data-sort="amount">金額 ↓</button><button type="button" data-sort="date">日期 ↓</button></div></div>
+    <p id="sort-description" class="sort-description"></p>
+    <div id="detail-list" class="detail-list"></div>
+    <div class="detail-footer"><button type="button" class="secondary" data-close>關閉明細</button></div>
+  </dialog>
+  <dialog id="calendar-dialog" aria-labelledby="calendar-title">
+    <div class="sheet-header"><div><h2 id="calendar-title">選擇日期</h2><p>點選日期，跳至當天的記帳明細</p></div><button class="close" type="button" data-close aria-label="關閉日曆">×</button></div>
+    <div class="calendar-body">
+      <div class="calendar-navigation"><button class="arrow" type="button" data-calendar-step="-1" aria-label="日曆上一個月">‹</button><select id="calendar-year" aria-label="日曆年份"></select><select id="calendar-month" aria-label="日曆月份"></select><button class="arrow" type="button" data-calendar-step="1" aria-label="日曆下一個月">›</button></div>
+      <div class="calendar-weekdays" aria-hidden="true"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+      <div id="calendar-days" class="calendar-days" aria-label="選擇記帳日期"></div>
+      <p class="calendar-hint">實框為目前選擇的日期，底線標示今天</p>
+    </div>
+    <div class="sheet-footer"><button type="button" class="secondary" data-close>取消</button><button type="button" class="primary" data-calendar-today>跳到今天</button></div>
+  </dialog>
+  <dialog id="delete-dialog" aria-labelledby="delete-title">
+    <div class="sheet-header"><div><h2 id="delete-title">刪除這筆花費？</h2><p>刪除後，當日明細與統計會一起更新。</p></div><button class="close" type="button" data-close aria-label="關閉刪除確認">×</button></div>
+    <div id="delete-preview" class="delete-preview"></div>
+    <div class="sheet-footer"><button type="button" class="secondary" data-close autofocus>取消</button><button type="button" class="primary" data-confirm-delete>確認刪除</button></div>
+  </dialog>
+  <dialog id="import-dialog" aria-labelledby="import-title">
+    <div class="sheet-header"><div><h2 id="import-title">確認匯入？</h2><p>新增這批花費，保留原有紀錄。</p></div><button class="close" type="button" data-close aria-label="關閉匯入確認">×</button></div>
+    <div class="sheet-body"><p id="import-confirm-file" class="file-name"></p><div class="transfer-summary"><div><span>新增筆數</span><strong>18 筆</strong></div><div><span>花費總額</span><strong>NT$ 3,269</strong></div></div><p class="transfer-note">線稿示意，不會寫入資料庫。</p></div>
+    <div class="sheet-footer"><button type="button" data-close autofocus>返回檢查</button><button type="button" class="primary" data-import-confirm>確認匯入</button></div>
+  </dialog>
+  <script src="category-colors.js"></script>
+  <script src="wireframe.js"></script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>記帳 App｜手機線稿總覽</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#eee;color:#222;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}header{padding:34px 36px 24px;border-bottom:1px solid #ccc;background:#fafafa}header>div{display:flex;align-items:center;justify-content:space-between;gap:20px;max-width:1600px;margin:auto}h1{font-size:25px;margin:0 0 9px}header p{font-size:13px;line-height:1.8;color:#666;margin:0}a{color:inherit}header a{padding:12px 17px;border:1px solid #333;background:#222;color:white;border-radius:8px;text-decoration:none;white-space:nowrap;font-size:14px}.gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:40px 30px;padding:30px 36px;max-width:1680px;margin:auto}.screen{min-width:0}.screen h2{font-size:16px;margin:0 0 8px}.screen h2 a{text-decoration:none}.screen h2 a:hover{text-decoration:underline}.screen p{font-size:12px;color:#666;line-height:1.8;min-height:44px;margin:0 0 14px;max-width:340px}.frame{width:312px;height:675.2px;border:1px solid #aaa;border-radius:16px;overflow:hidden;background:white;box-shadow:0 4px 12px #0001}iframe{width:390px;height:844px;border:0;transform:scale(.8);transform-origin:top left;display:block}footer{padding:10px 36px 30px;font-size:12px;line-height:1.9;color:#666;max-width:1680px;margin:auto}@media(max-width:600px){header{padding:24px 20px}header>div{display:block}header a{display:inline-block;margin-top:15px}.gallery{padding:24px 20px;grid-template-columns:1fr}.screen,.frame{margin-inline:auto}footer{padding-inline:20px}}
+    body{background:#edf2f1;color:#243438}header{background:#fafdfb;border-color:#dce5e2}header a{background:#17665d;border-color:#17665d}.frame{border-color:#c9d9d1;box-shadow:0 4px 16px #244f3910}.screen h2{color:#244d3e}.palette{max-width:1680px;margin:0 auto;padding:24px 36px 0;display:flex;gap:10px;flex-wrap:wrap}.palette-item{background:white;border:1px solid #dce5e2;border-radius:10px;padding:11px 14px;display:flex;align-items:center;gap:10px;font-size:13px}.palette-dot{width:22px;height:22px;border-radius:7px}.palette-item strong{display:block;font-size:13px}.palette-item small{display:block;font-size:11px;color:#69776e;margin-top:3px;font-family:monospace}@media(max-width:600px){.palette{padding:20px 20px 0;gap:8px}.palette-item{flex:1 0 42%;padding:10px}}
+  </style>
+</head>
+<body>
+  <header><div><div><h1>記帳 App · 手機線稿</h1><p>每日紀錄 → 新增花費 → 月／年統計 → 分類明細<br>分類配色已套用至所有畫面。金額均為示意資料，各手機畫面皆可操作。</p></div><a href="index.html">開啟完整互動預覽 ↗</a></div></header>
+  <div id="palette" class="palette" aria-label="八個分類的固定配色"></div>
+  <main class="gallery">
+    <section class="screen"><h2><a href="index.html">01　每日明細 ↗</a></h2><p>進入即顯示今天。點日期開啟日曆，每筆明細右側可刪除，新增按鈕固定於底部。</p><div class="frame"><iframe title="每日明細線稿" src="index.html"></iframe></div></section>
+    <section class="screen"><h2><a href="index.html?view=add">02　新增花費彈窗 ↗</a></h2><p>金額、說明、八個展開類別與目前選擇。儲存後關閉彈窗，回到當日明細。</p><div class="frame"><iframe title="新增花費彈窗線稿" src="index.html?view=add"></iframe></div></section>
+    <section class="screen"><h2><a href="index.html?view=month">03　月統計 ↗</a></h2><p>預設當月；上方圓餅圖、下方分類加總。重複點「金額」切換由大到小／由小到大。</p><div class="frame"><iframe title="月統計線稿" src="index.html?view=month"></iframe></div></section>
+    <section class="screen"><h2><a href="index.html?view=detail">04　分類明細彈窗 ↗</a></h2><p>預設金額由大到小；重複點同一排序按鈕可反向，也可依日期由新到舊／由舊到新。</p><div class="frame"><iframe title="分類明細彈窗線稿" src="index.html?view=detail"></iframe></div></section>
+    <section class="screen"><h2><a href="index.html?view=year">05　年統計 ↗</a></h2><p>沿用月統計版面，改為全年圓餅圖與分類加總。左右滑動切換年份。</p><div class="frame"><iframe title="年統計線稿" src="index.html?view=year"></iframe></div></section>
+    <section class="screen"><h2><a href="index.html?view=year-detail">06　年度分類明細 ↗</a></h2><p>彈窗沿用相同排序操作，查詢範圍改為所選年份。</p><div class="frame"><iframe title="年度分類明細線稿" src="index.html?view=year-detail"></iframe></div></section>
+    <section class="screen"><h2><a href="index.html?view=calendar">07　日曆跳轉 ↗</a></h2><p>點每日明細的日期開啟，可選年份、月份，再點日期直接跳轉，也能一鍵回到今天。</p><div class="frame"><iframe title="日曆跳轉線稿" src="index.html?view=calendar"></iframe></div></section>
+    <section class="screen"><h2><a href="index.html?view=delete">08　刪除花費確認 ↗</a></h2><p>刪除前顯示金額、說明與日期供確認，刪除後同步更新每日明細及統計。</p><div class="frame"><iframe title="刪除花費確認線稿" src="index.html?view=delete"></iframe></div></section>
+    <section class="screen"><h2><a href="index.html?view=import">09　匯入：選擇檔案 ↗</a></h2><p>底部新增匯入匯出。上方頁籤切換操作，選來源與 CSV，或用示範檔案試操作。</p><div class="frame"><iframe title="匯入選擇檔案線稿" src="index.html?view=import"></iframe></div></section>
+    <section class="screen"><h2><a href="index.html?view=import-preview">10　匯入：預覽確認 ↗</a></h2><p>先檢查筆數、總金額、日期及前幾筆紀錄，按匯入後再開確認彈窗。</p><div class="frame"><iframe title="匯入預覽線稿" src="index.html?view=import-preview"></iframe></div></section>
+    <section class="screen"><h2><a href="index.html?view=import-done">11　匯入：完成 ↗</a></h2><p>顯示本批新增筆數、總額與日期，可繼續匯入下一份。此線稿不會寫入資料庫。</p><div class="frame"><iframe title="匯入完成線稿" src="index.html?view=import-done"></iframe></div></section>
+    <section class="screen"><h2><a href="index.html?view=export">12　匯出：選擇範圍 ↗</a></h2><p>全部、本月或自訂日期；顯示筆數與總額，按匯出預覽下載流程，不產生真實檔案。</p><div class="frame"><iframe title="匯出選擇範圍線稿" src="index.html?view=export"></iframe></div></section>
+  </main>
+  <footer>預覽基準日：2026/11/06。每個預覽畫面各自使用暫存示意資料，重新整理後還原。<br>日期切換：左滑＝上一期，右滑＝下一期；電腦可使用左右箭頭按鈕。第一版先不前往未來日期。</footer>
+  <script src="category-colors.js"></script>
+  <script>
+    document.getElementById('palette').innerHTML=Object.entries(BOOKKEEPER_CATEGORY_COLORS).map(([name,colors])=>`<div class="palette-item"><span class="palette-dot" style="background:${colors.color}" aria-hidden="true"></span><div><strong style="color:${colors.ink}">${name}</strong><small>${colors.color}</small></div></div>`).join('');
+  </script>
+</body>
+</html>
