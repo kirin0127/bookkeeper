@@ -10,7 +10,7 @@
 
 1. 在 GitHub repository 的 **Settings → Secrets and variables → Actions** 新增：
    - `INITIAL_ACCOUNT_USERNAME`：登入帳號，3～64 個英文字母、數字、句點、底線、連字號，第一個字元為英文字母或數字；後端統一為小寫。
-   - `INITIAL_ACCOUNT_PASSWORD`：15～128 個字元的密碼，可含空白與中文；不要貼進 Git、workflow input 或聊天。
+   - `INITIAL_ACCOUNT_PASSWORD`：8～128 個字元的密碼，不要求大小寫、數字或特殊符號的組合，可含空白與中文；不要貼進 Git、workflow input 或聊天。
 2. 提交程式並 push `main`，等待 **Deploy Bookkeeper** 成功。Actions 在 runner 計算密碼雜湊，只將帳號與雜湊放入 release；明文密碼不會傳到 VPS。套件內 `initial-account.json` 位於前端公開目錄之外。
 3. 第一次啟動若識別為舊版單人資料庫，後端會先建立 `/var/lib/bookkeeper/bookkeeper.db.single-user-時間.bak`，再建立空白新版 schema 與初始帳號；不搬移支出，登入後自行重新匯入 CSV。新版資料庫後續部署不重建，初始帳號 Secrets 也不會覆寫既有帳號或密碼。
 4. **先保留原本 Caddy Basic Auth**，開啟網站，通過原本 Basic Auth 後，確認能看到 app 登入頁，並用新帳號成功登入與登出。
@@ -156,7 +156,7 @@ bookkeeper-vps ssh-ed25519 AAAA...
 | `VPS_USER` | 你已存在的部署登入帳號 |
 | `VPS_SSH_KEY` | 對應這個帳號的既有完整私鑰，包含 BEGIN／END 行 |
 | `INITIAL_ACCOUNT_USERNAME` | 首次建立 app 帳號使用；規則見上方升級流程 |
-| `INITIAL_ACCOUNT_PASSWORD` | 首次建立 app 密碼使用，15～128 個字元 |
+| `INITIAL_ACCOUNT_PASSWORD` | 首次建立 app 密碼使用，8～128 個字元 |
 
 不需要 `VPS_KNOWN_HOSTS` Secret，也不需要 GitHub Variables。SSH 預設 22 埠；若你的 SSH 使用其他埠，直接修改 `.github/workflows/deploy.yml` 的 `VPS_PORT` 常數即可。
 

@@ -11,7 +11,7 @@ const prompt = createInterface({ input: process.stdin, output, terminal: true })
 let db;
 try {
   const username = normalizeUsername(process.argv[2] || await prompt.question('帳號：'));
-  process.stdout.write('密碼（15～128 個字元，不顯示輸入）：');
+  process.stdout.write('密碼（8～128 個字元，不顯示輸入）：');
   hidden = true;
   const password = await prompt.question('');
   process.stdout.write('\n再次輸入密碼：');

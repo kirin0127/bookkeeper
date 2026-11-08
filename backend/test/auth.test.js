@@ -12,7 +12,7 @@ import { cookieName, tokenHash, sessionLifetimeMs } from '../src/auth.js';
 import { bootstrapAccount, readInitialAccount } from '../src/bootstrap.js';
 import { prepareInitialAccount } from '../../scripts/prepare-initial-account.mjs';
 
-const password = 'a test password with spaces';
+const password = 'abcdefgh';
 const password_hash = await hashPassword(password);
 const first = { username: 'alice', password_hash };
 
@@ -163,12 +163,14 @@ test('release bootstrap contains only a password hash and never overwrites accou
   try {
     assert.equal(await prepareInitialAccount(directory, {}), false);
     await assert.rejects(prepareInitialAccount(directory, { INITIAL_ACCOUNT_USERNAME: 'alice' }));
-    await assert.rejects(hashPassword('short'));
-    await prepareInitialAccount(directory, { INITIAL_ACCOUNT_USERNAME: 'ALICE', INITIAL_ACCOUNT_PASSWORD: password });
-    assert.ok(!readFileSync(join(directory, 'initial-account.json'), 'utf8').includes(password));
+    await assert.rejects(hashPassword('a'.repeat(7)), /8～128/);
+    await assert.rejects(hashPassword('a'.repeat(129)), /8～128/);
+    const initialPassword = '12345678';
+    await prepareInitialAccount(directory, { INITIAL_ACCOUNT_USERNAME: 'ALICE', INITIAL_ACCOUNT_PASSWORD: initialPassword });
+    assert.ok(!readFileSync(join(directory, 'initial-account.json'), 'utf8').includes(initialPassword));
     const initial = readInitialAccount(directory);
     assert.equal(initial.username, 'alice');
-    assert.equal(await verifyPassword(password, initial.password_hash), true);
+    assert.equal(await verifyPassword(initialPassword, initial.password_hash), true);
     db = openDatabase(path);
     assert.throws(() => bootstrapAccount(db, null), /尚未建立帳號/);
     bootstrapAccount(db, initial);

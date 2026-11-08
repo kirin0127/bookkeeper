@@ -15,8 +15,8 @@ export function normalizeUsername(value) {
 }
 
 export function validatePassword(password) {
-  if (typeof password !== 'string' || [...password].length < 15 || [...password].length > 128 || Buffer.byteLength(password) > 1024) {
-    throw new Error('密碼需為 15～128 個字元，可使用空白與中文。');
+  if (typeof password !== 'string' || [...password].length < 8 || [...password].length > 128 || Buffer.byteLength(password) > 1024) {
+    throw new Error('密碼需為 8～128 個字元，可使用空白與中文。');
   }
 }
 
