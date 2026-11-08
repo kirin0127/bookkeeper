@@ -64,6 +64,11 @@ mv -Tf "$ROOT/current.next" "$ROOT/current"
 switched=true
 sudo -n /usr/bin/systemctl restart bookkeeper.service
 health_check "$release_id"
+# Confirm authentication is active before reporting a successful deployment.
+for path in /api/auth/me /api/categories /api/exports/csv; do
+  [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
+    -H 'X-Forwarded-Proto: https' "http://127.0.0.1:3001$path")" == 401 ]]
+done
 echo "Deployed $release_id successfully."
 trap - ERR
 

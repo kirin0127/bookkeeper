@@ -36,6 +36,8 @@ jobs:
       - name: Package Linux production release
         env:
           RELEASE_ID: ${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+          INITIAL_ACCOUNT_USERNAME: ${{ secrets.INITIAL_ACCOUNT_USERNAME }}
+          INITIAL_ACCOUNT_PASSWORD: ${{ secrets.INITIAL_ACCOUNT_PASSWORD }}
         run: |
           node scripts/package-release.mjs "$RUNNER_TEMP/bookkeeper-release" "$RELEASE_ID"
           tar -czf "$RUNNER_TEMP/bookkeeper.tar.gz" -C "$RUNNER_TEMP/bookkeeper-release" .

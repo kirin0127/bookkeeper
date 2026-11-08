@@ -31,11 +31,10 @@ async function download() {
   if (busy.value || !summary.value?.count || range.value === false) return;
   busy.value = true; error.value = ''; downloaded.value = false;
   try {
-    const response = await downloadExport(range.value);
-    const blob = await response.blob();
+    const { blob, disposition } = await downloadExport(range.value);
     const url = URL.createObjectURL(blob), link = document.createElement('a');
     link.href = url;
-    link.download = /filename="([^"]+)"/.exec(response.headers.get('Content-Disposition') || '')?.[1] || `bookkeeper-${props.today}.csv`;
+    link.download = /filename="([^"]+)"/.exec(disposition)?.[1] || `bookkeeper-${props.today}.csv`;
     document.body.append(link); link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 60000);
     downloaded.value = true;

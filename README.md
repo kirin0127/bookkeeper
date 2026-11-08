@@ -9,14 +9,17 @@ Vue 3 + Vite 前端、Express 後端、SQLite 資料庫。沿用手機線稿的�
 ```sh
 cd /Users/jeffchuangmbp2024/Desktop/Projects/bookkeeper
 npm ci
+npm run account:create
 npm run dev
 ```
 
 如果使用 nvm，可以先執行 `nvm install`、`nvm use`，讀取專案的 `.nvmrc`。
 
-開啟 **http://127.0.0.1:5173**。前端使用 5173 埠，後端使用 3001 埠；前端透過 Vite 代理 `/api`，不需另外設定 CORS。終端機按 `Ctrl+C` 同時停止兩個服務。
+首次先執行 `npm run account:create`，依提示建立帳號（3～64 個英文字母、數字、句點、底線、連字號；不分大小寫）及密碼（15～128 個字元，輸入不顯示）。後續不必重建帳號；同一指令可新增其他使用者。密碼以含隨機 salt 的 scrypt 雜湊保存，不儲存明文。
 
-第一次啟動後端會建立 `database/bookkeeper.db`，執行 `database/schema.sql` 與 `database/init.sql`，加入 ID 1～8 的類別。已有資料庫不會重建或清空。沒有內建假資料；Fortune City CSV 需透過「匯入匯出」選檔並確認後才寫入。
+開啟 **https://127.0.0.1:5173**。Vite 官方 basic-ssl 外掛產生本機自簽憑證，第一次開啟需接受瀏覽器的本機憑證提示；正式環境由 Caddy 提供有效憑證。前端使用 HTTPS 5173 埠，後端仍只在 loopback 的 HTTP 3001 埠服務；前端代理 `/api` 並標記外部 HTTPS，不需另外設定 CORS。終端機按 `Ctrl+C` 同時停止兩個服務。
+
+建立帳號時會建立 `database/bookkeeper.db`，執行 `database/schema.sql` 與 `database/init.sql`，加入 ID 1～8 的共用類別。新版資料庫會保留帳號、session 與記帳資料。若是舊版三張表的單人資料庫，建立帳號指令會先在相同目錄保存 `.single-user-時間.bak` 備份，再建立空白新版資料庫；舊資料請自行重新匯入。沒有內建假資料。
 
 也可使用兩個終端機，分別執行：
 
@@ -60,7 +63,7 @@ npm run dev:frontend
 - 檔案需為 UTF-8 CSV，可含 BOM；最大 5 MB、50,000 筆，單筆 CSV 大小最多 64 KiB。
 - 符合類別的資料若有金額、幣別或日期錯誤，整批停止，顯示前 20 個錯誤與資料筆數。修正後重新選檔，不會部分寫入。
 - 確認時重新解析及驗證，`import_batches` 與所有 `expenses` 使用同一個 transaction；任何寫入失敗都會回復。
-- 以來源和原始檔案 SHA-256 阻擋相同檔案重複匯入（改檔名也不會重複匯入）。不同檔案即使內容有重疊，仍會新增，不會猜測哪些是重複消費。
+- 每個帳號分別以來源和原始檔案 SHA-256 阻擋重複匯入（改檔名也不會重複匯入）；不同帳號可以匯入相同檔案。不同檔案即使內容有重疊，仍會新增，不會猜測哪些是重複消費。
 - `import_batches.source` 使用 `fortune-city` 或 `bookkeeper`；略過筆數僅供預覽顯示，沒有新增資料庫欄位。
 - `source_row_number` 是不含標題列的 CSV 邏輯資料筆數，欄位內換行不會被算成新的一筆。
 
@@ -83,14 +86,16 @@ npm run build
 npm start
 ```
 
-開啟 **http://127.0.0.1:3001**。後端同時提供打包後的前端與 API，此模式只需一個 Node 程序，不需執行 Vite 開發伺服器。前端可在本機打包，再將 `frontend/dist` 部署至 VPS。
+後端同時提供打包後的前端與 API；登入與資料 API 必須經 HTTPS 反向代理使用，直接開啟 `http://127.0.0.1:3001` 無法登入。正式環境由 Caddy 反向代理，`/api/health` 可透過 loopback HTTP 供部署檢查。
 
-目前是單人版，沒有 app 內建登入頁面；服務只監聽 `127.0.0.1`。VPS 部署透過 Caddy HTTPS 與 Basic Auth 保護網站及 API。完整的 GitHub Actions、VPS 首次設定與備份步驟見 [部署說明](deploy/README.md)。部署設定已備妥，尚未連線至你的 VPS 執行。
+目前提供 app 登入頁與多使用者資料隔離，服務只監聽 `127.0.0.1`。登入建立七天固定期限的後端 session；cookie 一律為 `__Host-session; Secure; HttpOnly; SameSite=Lax; Path=/`，不設 Domain。資料庫只保存 token 的 SHA-256 雜湊，瀏覽器不在 localStorage 保存 token。重新登入換發 token、登出只撤銷目前裝置，過期回登入頁；分頁間登入／登出會重新確認身分。寫入 API 要求完全相同的 Origin，登入有十五分鐘的帳號／IP 嘗試限制及最多兩個並行密碼驗證。
+
+Caddy 只負責 HTTPS 與反向代理，移除舊 Basic Auth 前需先完成 Actions 部署並驗證 app 登入。既有 VPS 升級只需新增兩個 GitHub 初始帳號 Secrets、push main，然後手動修改 Caddyfile；完整流程見 [部署說明](deploy/README.md)。
 
 ## 資料與設定
 
 - 類別依 `init.sql` 使用固定 ID，資料處理與時間填入由程式負責，不修改既有 schema。
-- 金額以整數 TWD 儲存，單筆範圍為 1～1,000,000,000 元。沒有收入與帳戶功能。
+- 金額以整數 TWD 儲存，單筆範圍為 1～1,000,000,000 元。沒有收入與財務帳戶功能；`accounts` 代表網站登入使用者。
 - `recorded_at_ms`、`created_at_ms`、`updated_at_ms` 都是 Unix timestamp 毫秒。
 - 畫面顯示、每日分組、月／年統計固定使用 `Asia/Taipei`，不受伺服器時區影響。時區切換 UI 尚未實作。
 - 今日新增使用實際時間；補記過去日期使用該日台北時間 12:00，因目前表單沒有時間欄位。CSV 匯入保留來源的實際時間。
@@ -107,7 +112,7 @@ npm test
 npm run build
 ```
 
-測試使用記憶體與臨時 SQLite，不修改 `database/bookkeeper.db`。涵蓋初始化與重新開啟、固定類別 ID、API 新增／刪除、輸入驗證、台北日期邊界、閏年與跨年，以及 CSV 略過規則、重複匯入、交易回復、BOM／多行說明、匯出範圍、ISO 時區／毫秒與再次匯入一致性。
+測試使用記憶體與臨時 SQLite，不修改 `database/bookkeeper.db`。涵蓋登入、cookie 屬性、session 輪替／過期／撤銷／重啟保留、HTTPS 與來源檢查、登入節流、跨帳號資料與匯入匯出隔離、首次部署帳號與舊格式備份重建，以及既有的 API、日期與 CSV 測試。
 
 ## 專案結構
 

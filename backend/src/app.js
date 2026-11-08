@@ -3,31 +3,28 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { root } from './database.js';
 import { createTransferRouter, TransferError } from './transfer.js';
+import { createAuth, checkWriteOrigin, requireHttps } from './auth.js';
 
 const earliest = Date.parse('1900-01-01T00:00:00+08:00');
 const maxRange = 367 * 86400000;
 const columns = 'e.id, e.category_id, c.name AS category, e.amount, e.currency, e.recorded_at_ms, e.note';
 
-export function createApp(db, { staticDirectory = resolve(root, 'frontend/dist'), releaseId = 'local' } = {}) {
+export function createApp(db, { staticDirectory = resolve(root, 'frontend/dist'), releaseId = 'local', authOptions } = {}) {
   const app = express();
   app.disable('x-powered-by');
+  // Only the local Caddy/Vite proxy may supply protocol and client-IP headers.
+  app.set('trust proxy', 'loopback');
+  const auth = createAuth(db, authOptions);
   app.use('/api', (req, res, next) => {
     res.set('Cache-Control', 'no-store');
-    // No cross-origin writes. The frontend and API share one origin.
-    if (!['GET', 'HEAD'].includes(req.method) && req.get('Origin')) {
-      try {
-        if (new URL(req.get('Origin')).host !== req.get('Host')) {
-          return res.status(403).json({ error: '不允許跨來源寫入。' });
-        }
-      } catch {
-        return res.status(403).json({ error: '無效的來源。' });
-      }
-    }
     next();
   });
+  app.use('/api', checkWriteOrigin);
   app.use(express.json({ limit: '16kb' }));
-  app.use('/api', createTransferRouter(db));
   app.get('/api/health', (_req, res) => res.json({ ok: true, release: releaseId }));
+  app.use('/api/auth', auth.router);
+  app.use('/api', requireHttps, auth.requireAccount);
+  app.use('/api', createTransferRouter(db));
   app.get('/api/categories', (_req, res) => {
     res.json(db.prepare('SELECT id, name, sort_order, is_active FROM categories ORDER BY sort_order, id').all());
   });
@@ -39,7 +36,8 @@ export function createApp(db, { staticDirectory = resolve(root, 'frontend/dist')
       return res.status(400).json({ error: '請提供有效的起訖時間，範圍最多一年。' });
     }
     res.json(db.prepare(`SELECT ${columns} FROM expenses e JOIN categories c ON c.id = e.category_id
-      WHERE e.recorded_at_ms >= ? AND e.recorded_at_ms < ? ORDER BY e.recorded_at_ms DESC, e.id DESC`).all(start, end));
+      WHERE e.account_id = ? AND e.recorded_at_ms >= ? AND e.recorded_at_ms < ?
+      ORDER BY e.recorded_at_ms DESC, e.id DESC`).all(req.account.id, start, end));
   });
   app.post('/api/expenses', (req, res) => {
     const { category_id, amount, recorded_at_ms, note = '' } = req.body ?? {};
@@ -57,8 +55,8 @@ export function createApp(db, { staticDirectory = resolve(root, 'frontend/dist')
     }
     const now = Date.now();
     const result = db.prepare(`INSERT INTO expenses
-      (category_id, amount, currency, recorded_at_ms, note, created_at_ms, updated_at_ms)
-      VALUES (?, ?, 'TWD', ?, ?, ?, ?)`).run(category_id, amount, recorded_at_ms, note.trim(), now, now);
+      (account_id, category_id, amount, currency, recorded_at_ms, note, created_at_ms, updated_at_ms)
+      VALUES (?, ?, ?, 'TWD', ?, ?, ?, ?)`).run(req.account.id, category_id, amount, recorded_at_ms, note.trim(), now, now);
     const record = db.prepare(`SELECT ${columns} FROM expenses e JOIN categories c ON c.id = e.category_id WHERE e.id = ?`).get(Number(result.lastInsertRowid));
     res.status(201).json(record);
   });
@@ -67,7 +65,7 @@ export function createApp(db, { staticDirectory = resolve(root, 'frontend/dist')
     if (!/^\d+$/.test(req.params.id) || !Number.isSafeInteger(id) || id <= 0) {
       return res.status(400).json({ error: '無效的紀錄編號。' });
     }
-    if (!db.prepare('DELETE FROM expenses WHERE id = ?').run(id).changes) {
+    if (!db.prepare('DELETE FROM expenses WHERE id = ? AND account_id = ?').run(id, req.account.id).changes) {
       return res.status(404).json({ error: '這筆紀錄已不存在，請重新整理。' });
     }
     res.status(204).end();

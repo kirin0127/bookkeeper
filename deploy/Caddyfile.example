@@ -1,8 +1,6 @@
 # Append this site block to the existing /etc/caddy/Caddyfile.
-# Replace the domain and the password hash from `caddy hash-password`.
+# Deploy and verify the app login before removing an existing basic_auth block.
+# Replace the domain. Caddy handles HTTPS; the app handles authentication.
 book.example.com {
-    basic_auth {
-        jeff REPLACE_WITH_PASSWORD_HASH
-    }
     reverse_proxy 127.0.0.1:3001
 }

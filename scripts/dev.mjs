@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 
 const processes = ['backend', 'frontend'].map(workspace => spawn(
-  'npm', ['run', 'dev', '--workspace', workspace], { stdio: 'inherit' },
+  process.execPath, [process.env.npm_execpath, 'run', 'dev', '--workspace', workspace], { stdio: 'inherit' },
 ));
 let stopping = false;
 function stop(code = 0) {

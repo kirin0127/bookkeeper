@@ -43,7 +43,8 @@ function parseRecordedAt(value, source) {
   return calendarTimestamp(...match.slice(1, 7).map(Number), Number((match[7] || '').padEnd(3, '0')), offset);
 }
 
-export function prepareImport(db, bytes, source, filename) {
+export function prepareImport(db, bytes, source, filename, accountId) {
+  if (!Number.isSafeInteger(accountId) || accountId <= 0) throw new TransferError('缺少有效的使用者。', 401);
   if (!['fortune-city', 'bookkeeper'].includes(source)) throw new TransferError('請選擇有效的檔案來源。');
   if (typeof filename !== 'string' || !filename.trim() || filename.length > 255 || /[\r\n\0]/.test(filename) || !/\.csv$/i.test(filename)) {
     throw new TransferError('請選擇 CSV 檔案。');
@@ -100,8 +101,10 @@ export function prepareImport(db, bytes, source, filename) {
     }
   }
   const hash = createHash('sha256').update(bytes).digest('hex');
-  const duplicate = db.prepare('SELECT id, imported_at_ms, imported_rows FROM import_batches WHERE source = ? AND file_sha256 = ?').get(source, hash);
+  const duplicate = db.prepare(`SELECT id, imported_at_ms, imported_rows FROM import_batches
+    WHERE account_id = ? AND source = ? AND file_sha256 = ?`).get(accountId, source, hash);
   return {
+    accountId,
     records: accepted,
     summary: {
       source, filename, file_sha256: hash, total_rows: rows.length, imported_rows: accepted.length,
@@ -120,17 +123,18 @@ export function commitImport(db, prepared, expectedHash) {
   db.exec('BEGIN IMMEDIATE');
   try {
     // Recheck inside the write transaction to protect against another process importing the same file.
-    if (db.prepare('SELECT id FROM import_batches WHERE source = ? AND file_sha256 = ?').get(summary.source, summary.file_sha256)) {
+    if (db.prepare('SELECT id FROM import_batches WHERE account_id = ? AND source = ? AND file_sha256 = ?')
+      .get(prepared.accountId, summary.source, summary.file_sha256)) {
       throw new TransferError('這份檔案已經匯入過，不會重複新增。', 409);
     }
     const now = Date.now();
-    const batch = db.prepare(`INSERT INTO import_batches (source, original_filename, file_sha256, total_rows, imported_rows, imported_at_ms)
-      VALUES (?, ?, ?, ?, ?, ?)`).run(summary.source, summary.filename, summary.file_sha256, summary.total_rows, records.length, now);
+    const batch = db.prepare(`INSERT INTO import_batches (account_id, source, original_filename, file_sha256, total_rows, imported_rows, imported_at_ms)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`).run(prepared.accountId, summary.source, summary.filename, summary.file_sha256, summary.total_rows, records.length, now);
     const batchId = Number(batch.lastInsertRowid);
-    const insert = db.prepare(`INSERT INTO expenses (category_id, amount, currency, recorded_at_ms, note,
-      import_batch_id, source_row_number, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const insert = db.prepare(`INSERT INTO expenses (account_id, category_id, amount, currency, recorded_at_ms, note,
+      import_batch_id, source_row_number, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     for (const record of records) {
-      insert.run(record.category_id, record.amount, record.currency, record.recorded_at_ms, record.note,
+      insert.run(prepared.accountId, record.category_id, record.amount, record.currency, record.recorded_at_ms, record.note,
         batchId, record.source_row_number, now, now);
     }
     db.exec('COMMIT');
@@ -138,33 +142,33 @@ export function commitImport(db, prepared, expectedHash) {
   } catch (error) { db.exec('ROLLBACK'); throw error; }
 }
 
-function exportFilter(query) {
-  if (query.start === undefined && query.end === undefined) return { sql: '', values: [] };
+function exportFilter(query, accountId) {
+  if (query.start === undefined && query.end === undefined) return { sql: ' WHERE e.account_id = ?', values: [accountId] };
   const start = Number(query.start), end = Number(query.end);
   if (!/^-?\d+$/.test(String(query.start)) || !/^-?\d+$/.test(String(query.end)) ||
       !Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < EARLIEST || end <= start ||
       end > Date.parse('2101-01-01T00:00:00+08:00')) throw new TransferError('請選擇有效的匯出日期範圍。');
-  return { sql: ' WHERE e.recorded_at_ms >= ? AND e.recorded_at_ms < ?', values: [start, end] };
+  return { sql: ' WHERE e.account_id = ? AND e.recorded_at_ms >= ? AND e.recorded_at_ms < ?', values: [accountId, start, end] };
 }
 
 export function createTransferRouter(db) {
   const router = Router();
   const csvBody = raw({ type: ['text/csv', 'application/octet-stream'], limit: MAX_FILE_BYTES });
   router.post('/imports/preview', csvBody, (req, res) => {
-    res.json(prepareImport(db, req.body, req.query.source, req.query.filename).summary);
+    res.json(prepareImport(db, req.body, req.query.source, req.query.filename, req.account.id).summary);
   });
   router.post('/imports/commit', csvBody, (req, res) => {
-    const prepared = prepareImport(db, req.body, req.query.source, req.query.filename);
+    const prepared = prepareImport(db, req.body, req.query.source, req.query.filename, req.account.id);
     res.status(201).json(commitImport(db, prepared, req.query.preview_hash));
   });
   router.get('/exports/preview', (req, res) => {
-    const filter = exportFilter(req.query);
+    const filter = exportFilter(req.query, req.account.id);
     const result = db.prepare(`SELECT COUNT(*) AS count, COALESCE(SUM(e.amount), 0) AS amount,
       MIN(e.recorded_at_ms) AS from_ms, MAX(e.recorded_at_ms) AS to_ms FROM expenses e${filter.sql}`).get(...filter.values);
     res.json(result);
   });
   router.get('/exports/csv', (req, res) => {
-    const filter = exportFilter(req.query);
+    const filter = exportFilter(req.query, req.account.id);
     const statement = db.prepare(`SELECT e.recorded_at_ms, c.name AS category, e.amount, e.currency, e.note
       FROM expenses e JOIN categories c ON c.id = e.category_id${filter.sql} ORDER BY e.recorded_at_ms, e.id`);
     const rows = statement.all(...filter.values);

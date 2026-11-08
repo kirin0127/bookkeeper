@@ -1,47 +1,92 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue';
-import DailyView from './views/DailyView.vue';
-import StatisticsView from './views/StatisticsView.vue';
-import TransferView from './views/TransferView.vue';
-import { getCategories } from './api';
-import { dayKey } from './lib/format';
-const tab = ref('daily'), today = ref(dayKey()), day = ref(today.value);
-const categories = ref([]), loading = ref(true), error = ref(''), toast = ref('');
-const transferBusy = ref(false);
-let timer, toastTimer;
-async function loadCategories() {
-  loading.value = true; error.value = '';
-  try { categories.value = await getCategories(); }
-  catch (failure) { error.value = failure.message; }
-  finally { loading.value = false; }
+import BookkeeperView from './views/BookkeeperView.vue';
+import LoginView from './views/LoginView.vue';
+import { getMe, login, logout, invalidateRequests } from './api';
+
+const state = ref('checking'), account = ref(null), error = ref(''), notice = ref('');
+const loggingIn = ref(false), loggingOut = ref(false), logoutError = ref('');
+const channel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('bookkeeper-auth') : null;
+let version = 0;
+function clearAccount() {
+  version++;
+  invalidateRequests();
+  account.value = null;
+  error.value = '';
+  logoutError.value = '';
+  loggingIn.value = false;
+  loggingOut.value = false;
 }
-function refreshToday() {
-  const current = dayKey();
-  if (day.value === today.value) day.value = current;
-  today.value = current;
+async function checkSession() {
+  clearAccount();
+  notice.value = '';
+  state.value = 'checking';
+  const current = version;
+  try {
+    const user = await getMe();
+    if (current !== version) return;
+    account.value = user;
+    state.value = 'authenticated';
+  } catch (failure) {
+    if (current !== version) return;
+    if (failure.status === 401) state.value = 'anonymous';
+    else { state.value = 'error'; error.value = failure.message; }
+  }
 }
-function notify(message) { toast.value = message; clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.value = '', 3000); }
+async function signIn(credentials) {
+  if (loggingIn.value) return;
+  loggingIn.value = true;
+  error.value = ''; notice.value = '';
+  const current = version;
+  try {
+    const user = await login(credentials);
+    if (current !== version) return;
+    invalidateRequests();
+    account.value = user;
+    state.value = 'authenticated';
+    channel?.postMessage('changed');
+  } catch (failure) {
+    if (current === version) error.value = failure.message;
+  } finally { if (current === version) loggingIn.value = false; }
+}
+async function signOut() {
+  if (loggingOut.value) return;
+  loggingOut.value = true;
+  logoutError.value = '';
+  const current = version;
+  try {
+    await logout();
+    if (current !== version) return;
+    clearAccount();
+    state.value = 'anonymous';
+    notice.value = '你已登出。';
+    channel?.postMessage('changed');
+  } catch (failure) {
+    if (current === version) logoutError.value = `登出未完成：${failure.message}`;
+  } finally { if (current === version) loggingOut.value = false; }
+}
+function expired() {
+  clearAccount();
+  state.value = 'anonymous';
+  notice.value = '登入已過期，請重新登入。';
+}
+function changed() { checkSession(); }
 onMounted(() => {
-  loadCategories();
-  timer = setInterval(refreshToday, 30000);
-  document.addEventListener('visibilitychange', refreshToday);
+  window.addEventListener('auth-expired', expired);
+  if (channel) channel.onmessage = changed;
+  checkSession();
 });
-onBeforeUnmount(() => { clearInterval(timer); clearTimeout(toastTimer); document.removeEventListener('visibilitychange', refreshToday); });
+onBeforeUnmount(() => { version++; window.removeEventListener('auth-expired', expired); channel?.close(); });
 </script>
 
 <template>
-  <div class="phone">
-    <header class="app-header"><span class="app-name">日常記帳</span><span class="timezone-label">台北時間 · TWD</span></header>
-    <main v-if="loading"><div class="loading-state" role="status">正在載入…</div></main>
-    <main v-else-if="error"><div class="error-state" role="alert"><p>{{ error }}</p><button @click="loadCategories">重新連線</button></div></main>
-    <DailyView v-else-if="tab === 'daily'" v-model:day="day" :today="today" :categories="categories" @notify="notify" />
-    <StatisticsView v-else-if="tab === 'stats'" :today="today" :categories="categories" />
-    <TransferView v-else :today="today" @busy="transferBusy = $event" />
-    <nav class="bottom-nav" aria-label="主要導覽">
-      <button :disabled="transferBusy" :class="{ active: tab === 'stats' }" :aria-current="tab === 'stats' ? 'page' : undefined" @click="tab = 'stats'"><span aria-hidden="true">◴</span>統計</button>
-      <button :disabled="transferBusy" :class="{ active: tab === 'daily' }" :aria-current="tab === 'daily' ? 'page' : undefined" @click="tab = 'daily'"><span aria-hidden="true">☷</span>每日明細</button>
-      <button :disabled="transferBusy" :class="{ active: tab === 'transfer' }" :aria-current="tab === 'transfer' ? 'page' : undefined" @click="tab = 'transfer'"><span aria-hidden="true">⇅</span>匯入匯出</button>
-    </nav>
-    <div class="toast" :class="{ show: toast }" role="status">{{ toast }}</div>
+  <BookkeeperView v-if="state === 'authenticated'" :key="account.id" :account="account" :logging-out="loggingOut" :logout-error="logoutError" @logout="signOut" />
+  <LoginView v-else-if="state === 'anonymous'" :busy="loggingIn" :error="error" :notice="notice" @submit="signIn" />
+  <div v-else class="phone">
+    <header class="app-header"><span class="app-name">日常記帳</span></header>
+    <main>
+      <div v-if="state === 'checking'" class="loading-state" role="status">正在確認登入狀態…</div>
+      <div v-else class="error-state" role="alert"><p>{{ error }}</p><button @click="checkSession">重新連線</button></div>
+    </main>
   </div>
 </template>

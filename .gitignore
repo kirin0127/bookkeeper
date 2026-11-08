@@ -2,6 +2,10 @@ node_modules/
 frontend/dist/
 database/*.db
 database/*.db-*
+database/*.bak
+initial-account.json
+.local-tls/
+.local-test/
 .env
 .env.*
 !.env.example

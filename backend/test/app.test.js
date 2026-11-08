@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
-import { openDatabase } from '../src/database.js';
+import { openTestDatabase as openDatabase, createTestClient } from './helpers.js';
 import { createApp } from '../src/app.js';
 import { dayKey, dayRange, periodRange, shiftDay, recordedTime } from '../../frontend/src/lib/format.js';
 
@@ -17,7 +17,7 @@ test('database initialization is persistent and does not reset existing categori
     assert.deepEqual(db.prepare('SELECT id, name FROM categories ORDER BY id').all().map(row => [row.id, row.name]),
       [[1, '食物'], [2, '飲品'], [3, '交通'], [4, '消費'], [5, '娛樂'], [6, '3C'], [7, '醫藥'], [8, '其他']]);
     db.prepare('UPDATE categories SET is_active = 0 WHERE id = 8').run();
-    db.prepare("INSERT INTO expenses (category_id, amount, currency, recorded_at_ms, note, created_at_ms, updated_at_ms) VALUES (1, 80, 'TWD', 1000, '保存測試', 2000, 2000)").run();
+    db.prepare("INSERT INTO expenses (account_id, category_id, amount, currency, recorded_at_ms, note, created_at_ms, updated_at_ms) VALUES (1, 1, 80, 'TWD', 1000, '保存測試', 2000, 2000)").run();
     db.close();
     db = openDatabase(path);
     assert.equal(db.prepare('SELECT COUNT(*) AS count FROM categories').get().count, 8);
@@ -43,8 +43,7 @@ test('expense API persists, validates and deletes records with inclusive/exclusi
   const db = openDatabase(':memory:');
   const server = createApp(db, { staticDirectory: null }).listen(0, '127.0.0.1');
   await once(server, 'listening');
-  const origin = `http://127.0.0.1:${server.address().port}`;
-  const request = (path, options) => fetch(`${origin}/api${path}`, options);
+  const request = createTestClient(db, server);
   const post = body => request('/expenses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   t.after(async () => { await new Promise(resolve => server.close(resolve)); db.close(); });
   const base = { amount: 100, category_id: 1, recorded_at_ms: Date.parse('2024-02-29T12:00:00+08:00'), note: '午餐' };

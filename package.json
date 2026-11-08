@@ -10,6 +10,7 @@
     "dev:backend": "npm run dev --workspace backend",
     "build": "npm run build --workspace frontend",
     "start": "npm run start --workspace backend",
+    "account:create": "node scripts/create-account.mjs",
     "test": "node --test backend/test/*.test.js"
   }
 }
