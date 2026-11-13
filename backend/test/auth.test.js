@@ -89,6 +89,7 @@ test('all data APIs require a session; rejects expiry, forged and ambiguous cook
     assert.equal((await request(path, { method: 'POST' })).status, 401, path);
   }
   assert.equal((await request('/expenses/1', { method: 'DELETE' })).status, 401);
+  assert.equal((await request('/expenses/1', { method: 'PATCH' })).status, 401);
   assert.equal((await request('/health', { headers: { 'X-Forwarded-Proto': 'http' } })).status, 200);
   const cookie = getCookie(await signIn());
   assert.equal((await request('/auth/me', { cookie: `${cookie}; ${cookie}` })).status, 401);
@@ -127,6 +128,10 @@ test('accounts cannot read, delete, export or interfere with each other imports'
   assert.equal((await (await request(`/expenses${query}`, { cookie: alice })).json()).length, 1);
   assert.deepEqual(await (await request(`/expenses${query}&account_id=1`, { cookie: bob })).json(), []);
   assert.equal((await request(`/expenses/${expense.id}`, { cookie: bob, method: 'DELETE' })).status, 404);
+  const beforeEdit = db.prepare('SELECT * FROM expenses WHERE id = ?').get(expense.id);
+  assert.equal((await request(`/expenses/${expense.id}`, { cookie: bob, method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: 999 }) })).status, 404);
+  assert.deepEqual(db.prepare('SELECT * FROM expenses WHERE id = ?').get(expense.id), beforeEdit);
   assert.equal((await (await request('/exports/preview', { cookie: bob })).json()).count, 0);
   assert.ok(!(await (await request('/exports/csv', { cookie: bob })).text()).includes('alice-private'));
 

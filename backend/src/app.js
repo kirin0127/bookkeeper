@@ -60,6 +60,38 @@ export function createApp(db, { staticDirectory = resolve(root, 'frontend/dist')
     const record = db.prepare(`SELECT ${columns} FROM expenses e JOIN categories c ON c.id = e.category_id WHERE e.id = ?`).get(Number(result.lastInsertRowid));
     res.status(201).json(record);
   });
+  app.patch('/api/expenses/:id', (req, res) => {
+    const id = Number(req.params.id);
+    if (!/^\d+$/.test(req.params.id) || !Number.isSafeInteger(id) || id <= 0) {
+      return res.status(400).json({ error: '無效的紀錄編號。' });
+    }
+    const existing = db.prepare('SELECT * FROM expenses WHERE id = ? AND account_id = ?').get(id, req.account.id);
+    if (!existing) return res.status(404).json({ error: '這筆紀錄已不存在，請重新整理。' });
+    const body = req.body;
+    const allowed = ['amount', 'category_id', 'note'];
+    if (!body || typeof body !== 'object' || Array.isArray(body) || !Object.keys(body).length ||
+        Object.keys(body).some(key => !allowed.includes(key))) {
+      return res.status(400).json({ error: '請提供要修改的金額、類別或說明。' });
+    }
+    const { amount = existing.amount, category_id = existing.category_id, note = existing.note } = body;
+    if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 1000000000) {
+      return res.status(400).json({ error: '金額需為 1～1,000,000,000 的整數。' });
+    }
+    // An existing inactive category may be retained, but cannot be newly selected.
+    if (!Number.isSafeInteger(category_id) || (category_id !== existing.category_id &&
+        !db.prepare('SELECT id FROM categories WHERE id = ? AND is_active = 1').get(category_id))) {
+      return res.status(400).json({ error: '請選擇有效的類別。' });
+    }
+    if (Object.hasOwn(body, 'note') && (typeof note !== 'string' || note.length > 200)) {
+      return res.status(400).json({ error: '說明最多 200 個字。' });
+    }
+    db.prepare(`UPDATE expenses SET amount = ?, category_id = ?, note = ?, updated_at_ms = ?
+      WHERE id = ? AND account_id = ?`).run(amount, category_id, Object.hasOwn(body, 'note') ? note.trim() : existing.note,
+        Date.now(), id, req.account.id);
+    const record = db.prepare(`SELECT ${columns} FROM expenses e JOIN categories c ON c.id = e.category_id
+      WHERE e.id = ? AND e.account_id = ?`).get(id, req.account.id);
+    res.json(record);
+  });
   app.delete('/api/expenses/:id', (req, res) => {
     const id = Number(req.params.id);
     if (!/^\d+$/.test(req.params.id) || !Number.isSafeInteger(id) || id <= 0) {

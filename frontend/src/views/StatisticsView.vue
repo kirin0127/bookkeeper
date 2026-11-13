@@ -48,7 +48,7 @@ const swipe = useSwipe(move);
 </script>
 
 <template>
-  <main @pointerdown="swipe.pointerdown" @pointerup="swipe.pointerup" @pointercancel="swipe.pointercancel" @click.capture="swipe.click">
+  <main @pointerdown="swipe.pointerdown" @pointermove="swipe.pointermove" @pointerup="swipe.pointerup" @pointercancel="swipe.pointercancel" @click.capture="swipe.click">
     <div class="page-heading"><h1>花費統計</h1><div class="segmented" aria-label="統計尺度"><button v-for="value in ['month', 'year']" :key="value" :class="{ active: scale === value }" :aria-pressed="scale === value" @click="setScale(value)">{{ value === 'month' ? '月' : '年' }}</button></div></div>
     <div class="period-nav"><button class="arrow" :aria-label="scale === 'month' ? '上一個月' : '上一年'" :disabled="year === 1900 && (scale === 'year' || month === 1)" @click="move(-1)">‹</button><div class="period-label"><strong>{{ periodText }}</strong><span>{{ scale === 'month' ? '每月統計' : '全年統計' }}</span></div><button class="arrow" :aria-label="scale === 'month' ? '下一個月' : '下一年'" :disabled="isCurrent" @click="move(1)">›</button></div>
     <p class="swipe-hint">← 左滑前一{{ scale === 'month' ? '月' : '年' }}　右滑後一{{ scale === 'month' ? '月' : '年' }} →</p>

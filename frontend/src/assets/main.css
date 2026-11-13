@@ -213,3 +213,12 @@ button:disabled:hover { cursor: default; }
 .transfer-warning ul { padding-left: 20px; }
 .transfer-note code { font-size: 11px; overflow-wrap: anywhere; }
 .file-button.disabled { opacity: .4; cursor: default; }
+
+.expense-row.editable { position: relative; }
+.edit-expense { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; border: 0; background: transparent; }
+.edit-expense:hover:not(:disabled) { background: transparent; }
+@media (hover: hover) { .expense-row.editable:has(.edit-expense:hover) { background: #f1f8f5; } }
+.edit-expense:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.expense-row.editable .delete-record { position: relative; z-index: 2; }
+textarea.note-input { font: inherit; resize: vertical; min-height: 70px; }
+textarea.note-input:focus-visible { outline: 3px solid #555; outline-offset: 3px; }

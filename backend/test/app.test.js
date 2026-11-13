@@ -39,6 +39,75 @@ test('Taipei day/month/year boundaries are independent of the host timezone', ()
   assert.equal(recordedTime('2024-02-29'), Date.parse('2024-02-29T12:00:00+08:00'));
 });
 
+test('editing expenses validates changes and preserves identity, dates and import provenance', async t => {
+  const db = openDatabase(':memory:');
+  const server = createApp(db, { staticDirectory: null }).listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  t.after(async () => { await new Promise(resolve => server.close(resolve)); db.close(); });
+  const request = createTestClient(db, server);
+  const patch = (id, body, headers = {}) => request(`/expenses/${id}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body),
+  });
+  db.prepare(`INSERT INTO import_batches VALUES (1, 1, 'bookkeeper', 'test.csv', 'test-hash', 1, 1, 1000)`).run();
+  db.prepare(`INSERT INTO expenses VALUES (1, 1, 1, 80, 'TWD', ?, '午餐', 1, 1, 1000, 1000)`)
+    .run(Date.parse('2024-02-29T12:00:00+08:00'));
+  const row = () => db.prepare('SELECT * FROM expenses WHERE id = 1').get();
+  const original = row();
+
+  await t.test('updates all editable fields and the timestamp without replacing the record', async () => {
+    const response = await patch(1, { amount: 120, category_id: 2, note: '  咖啡  ' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { id: 1, category_id: 2, category: '飲品', amount: 120,
+      currency: 'TWD', recorded_at_ms: original.recorded_at_ms, note: '咖啡' });
+    const updated = row();
+    assert.ok(updated.updated_at_ms > original.updated_at_ms);
+    assert.deepEqual({ ...updated }, { ...original, amount: 120, category_id: 2, note: '咖啡', updated_at_ms: updated.updated_at_ms });
+    const [start, end] = dayRange('2024-02-29');
+    const listed = await (await request(`/expenses?start=${start}&end=${end}`)).json();
+    assert.equal(listed.length, 1);
+    assert.equal(listed[0].amount, 120);
+    assert.equal(listed[0].category, '飲品');
+    assert.equal((await (await request('/exports/preview')).json()).amount, 120);
+    assert.match(await (await request('/exports/csv')).text(), /飲品,120,TWD,咖啡/);
+  });
+
+  await t.test('supports individual fields, empty descriptions and existing inactive categories', async () => {
+    db.prepare('UPDATE categories SET is_active = 0 WHERE id IN (2, 8)').run();
+    assert.equal((await patch(1, { note: '' })).status, 200);
+    assert.equal(row().note, '');
+    assert.equal(row().amount, 120);
+    assert.equal((await patch(1, { category_id: 2, amount: 150 })).status, 200);
+    assert.equal((await patch(1, { category_id: 8 })).status, 400);
+    assert.equal((await patch(1, { category_id: 3 })).status, 200);
+    assert.equal((await patch(1, { category_id: 2 })).status, 400);
+    const importedNote = '  匯入說明\n' + '字'.repeat(201) + '  ';
+    db.prepare('UPDATE expenses SET note = ? WHERE id = 1').run(importedNote);
+    assert.equal((await patch(1, { amount: 200 })).status, 200);
+    assert.equal(row().note, importedNote);
+  });
+
+  await t.test('rejects invalid values, protected fields and cross-origin writes without changes', async () => {
+    const before = row();
+    const invalid = [{}, [], null, { amount: 0 }, { amount: -1 }, { amount: 1.5 }, { amount: '100' },
+      { amount: null }, { amount: 1000000001 }, { category_id: 999 }, { category_id: '1' }, { category_id: null },
+      { note: null }, { note: 1 }, { note: 'a'.repeat(201) }, { amount: 300, note: 'a'.repeat(201) },
+      { account_id: 2 }, { id: 2 }, { recorded_at_ms: 1000 }, { currency: 'USD' },
+      { created_at_ms: 1000 }, { updated_at_ms: 1000 }, { import_batch_id: null }, { source_row_number: 2 }];
+    for (const body of invalid) {
+      assert.equal((await patch(1, body)).status, 400, JSON.stringify(body));
+      assert.deepEqual(row(), before);
+    }
+    assert.equal((await patch(1, { amount: 300 }, { Origin: 'https://unrelated.example' })).status, 403);
+    assert.deepEqual(row(), before);
+    for (const id of ['invalid', '0', '-1', '1.5', '9007199254740992']) {
+      assert.equal((await patch(id, { amount: 300 })).status, 400);
+    }
+    assert.equal((await patch(999, { amount: 300 })).status, 404);
+    db.prepare('DELETE FROM expenses WHERE id = 1').run();
+    assert.equal((await patch(1, { amount: 300 })).status, 404);
+  });
+});
+
 test('expense API persists, validates and deletes records with inclusive/exclusive date ranges', async t => {
   const db = openDatabase(':memory:');
   const server = createApp(db, { staticDirectory: null }).listen(0, '127.0.0.1');

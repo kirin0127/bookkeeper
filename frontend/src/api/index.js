@@ -37,6 +37,9 @@ export const addExpense = body => request('/expenses', {
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
 });
 export const deleteExpense = id => request(`/expenses/${id}`, { method: 'DELETE' });
+export const updateExpense = (id, body) => request(`/expenses/${id}`, {
+  method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+});
 
 export function importCsv(action, file, source, previewHash) {
   const params = new URLSearchParams({ source, filename: file.name });

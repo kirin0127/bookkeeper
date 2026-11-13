@@ -12,6 +12,7 @@ const props = defineProps({ categories: Array, day: String, today: String });
 const emit = defineEmits(['update:day', 'notify']);
 const { records, loading, error, reload } = useRecords(computed(() => dayRange(props.day)));
 const adding = ref(false), calendar = ref(false), deleting = ref(null), deletingBusy = ref(false), deleteError = ref('');
+const editing = ref(null);
 const relation = computed(() => props.day === props.today ? '今天' : props.day === shiftDay(props.today, -1) ? '昨天' : '');
 function selectDay(value) { emit('update:day', value); calendar.value = false; }
 function move(step) {
@@ -19,7 +20,11 @@ function move(step) {
   if (next <= props.today && next >= '1900-01-01') selectDay(next);
 }
 const swipe = useSwipe(move);
-function saved(record) { adding.value = false; reload(); emit('notify', `已新增 ${money(record.amount)}`); }
+function saved(record) {
+  const wasEditing = Boolean(editing.value);
+  adding.value = false; editing.value = null; reload();
+  emit('notify', `${wasEditing ? '已更新' : '已新增'} ${money(record.amount)}`);
+}
 function requestDelete(record) { deleting.value = record; deleteError.value = ''; }
 async function confirmDelete() {
   if (deletingBusy.value) return;
@@ -35,7 +40,7 @@ async function confirmDelete() {
 </script>
 
 <template>
-  <main @pointerdown="swipe.pointerdown" @pointerup="swipe.pointerup" @pointercancel="swipe.pointercancel" @click.capture="swipe.click">
+  <main @pointerdown="swipe.pointerdown" @pointermove="swipe.pointermove" @pointerup="swipe.pointerup" @pointercancel="swipe.pointercancel" @click.capture="swipe.click">
     <div class="page-heading"><h1>每日明細</h1><button class="small-button" :disabled="day === today" @click="selectDay(today)">回到今天</button></div>
     <div class="period-nav">
       <button class="arrow" aria-label="上一天" :disabled="day === '1900-01-01'" @click="move(-1)">‹</button>
@@ -47,12 +52,12 @@ async function confirmDelete() {
     <div v-else-if="error" class="error-state" role="alert"><p>{{ error }}</p><button @click="reload">重新載入</button></div>
     <template v-else>
       <section class="day-summary" aria-label="當日花費摘要"><div><p class="summary-label">{{ relation || '當日' }}花費</p><p class="summary-count">共 {{ records.length }} 筆</p></div><strong>{{ money(sum(records)) }}</strong></section>
-      <template v-if="records.length"><div class="list-heading"><h3>花費明細</h3><span>時間由新到舊</span></div><ExpenseList :records="records" deletable @delete="requestDelete" /></template>
+      <template v-if="records.length"><div class="list-heading"><h3>花費明細</h3><span>時間由新到舊 · 點選可編輯</span></div><ExpenseList :records="records" deletable editable @edit="editing = $event" @delete="requestDelete" /></template>
       <div v-else class="empty-state"><strong>這一天還沒有花費紀錄</strong><p>點下方按鈕，新增第一筆花費。</p></div>
     </template>
     <div class="add-area"><button class="primary add-button" @click="adding = true"><span aria-hidden="true">＋</span>新增花費</button></div>
   </main>
-  <ExpenseForm v-if="adding" :categories="categories" :day="day" @close="adding = false" @saved="saved" />
+  <ExpenseForm v-if="adding || editing" :categories="categories" :day="day" :record="editing" @close="adding = false; editing = null" @saved="saved" />
   <CalendarPicker v-if="calendar" :day="day" :today="today" @close="calendar = false" @select="selectDay" />
   <ModalSheet v-if="deleting" title="刪除這筆花費？" subtitle="刪除後，當日明細與統計會一起更新。" :busy="deletingBusy" @close="deleting = null">
     <ExpenseList :records="[deleting]" />
